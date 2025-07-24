@@ -4,13 +4,13 @@ Application de galerie pour visualiser et comparer les images de plans d'étage 
 
 ## 📋 Prérequis
 
-- Python 3.8 ou supérieur
+- Python 3.11
 - Credentials AWS avec accès au bucket S3
 - Bucket S3 contenant vos images et métadonnées
 
 ## 🚀 Installation
 
-### 1. Cloner ou télécharger les fichiers
+### 1. Clone
 
 Créez la structure de dossiers suivante :
 
@@ -28,20 +28,20 @@ floor-plan-gallery-streamlit/
 └── README.md
 ```
 
-### 2. Installer les dépendances
+### 2. Installer dépendances
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configuration des variables d'environnement
+### 3. Configuration variables d'environnement
 
 1. Copiez le fichier `.env.example` vers `.env` :
    ```bash
    cp .env.example .env
    ```
 
-2. Éditez le fichier `.env` avec vos vraies credentials :
+2. Éditez le fichier `.env` avec vraies credentials :
    ```env
    AWS_ACCESS_KEY_ID=votre_access_key_ici
    AWS_SECRET_ACCESS_KEY=votre_secret_key_ici
@@ -69,30 +69,8 @@ L'application sera accessible à l'adresse : `http://localhost:8501`
 - **Approche** : LoRA simple, approche combinée, etc.
 - **Modèle de base** : sdxl_base, juggernautXL
 - **Modèle LoRA** : lora_plan_v1, lora_plan_v2, wall_lora
-- **Recherche textuelle** : Dans les prompts
+- **Recherche textuelle** : Dans les prompts (en développement)
 
-### 🔄 Comparaisons
-- Groupement automatique par prompts similaires
-- Affichage côte à côte des variantes
-- Comparaison des temps de génération
-
-### 📈 Statistiques
-- Répartition par approche et modèle
-- Temps de génération moyens
-- Métriques générales
-
-## 📁 Structure des Données S3
-
-L'application s'attend à trouver dans votre bucket S3 :
-
-```
-bucket-name/
-├── generation_001.png
-├── generation_001_metadata.json
-├── generation_002.jpg
-├── generation_002_metadata.json
-└── ...
-```
 
 ### Format des métadonnées JSON
 
@@ -120,7 +98,7 @@ bucket-name/
 ### Modifier le nombre d'images par page
 Dans `app.py`, ligne ~108 :
 ```python
-items_per_page = 12  # Changez cette valeur
+items_per_page = 12
 ```
 
 ### Ajouter de nouveaux filtres
@@ -142,8 +120,6 @@ Modifiez la fonction `display_image_card()` dans `app.py`.
 
 ### Performance lente
 - Réduisez le nombre d'images par page
-- Vérifiez votre connexion internet
-- Considérez l'utilisation d'un CDN pour les images
 
 ## 📝 Logs et Debug
 
@@ -151,53 +127,3 @@ Pour activer le mode debug, ajoutez dans votre `.env` :
 ```env
 DEBUG=true
 ```
-
-Les logs Streamlit apparaîtront dans la console où vous avez lancé l'application.
-
-## 🔒 Sécurité
-
-- Ne jamais commiter le fichier `.env` avec vos vraies credentials
-- Utilisez des credentials AWS avec permissions minimales
-- Considérez l'utilisation de rôles IAM en production
-
-## 🚀 Déploiement
-
-### Option 1: Streamlit Cloud
-1. Poussez votre code sur GitHub
-2. Connectez-vous à [share.streamlit.io](https://share.streamlit.io)
-3. Déployez directement depuis votre repository
-4. Ajoutez vos variables d'environnement dans l'interface Streamlit Cloud
-
-### Option 2: Docker (local)
-Créez un `Dockerfile` :
-```dockerfile
-FROM python:3.9-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-EXPOSE 8501
-
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
-```
-
-## 📞 Support
-
-Si vous rencontrez des problèmes :
-1. Vérifiez les logs dans la console
-2. Testez la connexion S3 manuellement
-3. Vérifiez la structure de vos fichiers de métadonnées
-
-## 🔄 Évolutions Futures
-
-- [ ] Cache Redis pour améliorer les performances
-- [ ] Export des comparaisons en PDF
-- [ ] Filtres par date de création
-- [ ] Interface d'administration pour gérer le bucket
-- [ ] API REST pour intégration externe
-
-## 📄 Licence
-
-Projet académique - Master IA et Big Data
