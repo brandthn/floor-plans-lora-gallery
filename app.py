@@ -93,7 +93,7 @@ def main():
     )
     
     # Onglets principaux
-    tab1, tab2, tab3 = st.tabs(["📊 Galerie", "🔄 Comparaisons", "📈 Statistiques"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Galerie", "🔄 Comparaisons", "📈 Statistiques", "🔧 Debug"])
     
     with tab1:
         display_gallery(filtered_generations)
@@ -103,6 +103,9 @@ def main():
     
     with tab3:
         display_statistics(filtered_generations)
+    
+    with tab4:
+        display_debug_info()
 
 def apply_filters(generations, approaches, base_models, lora_models, search_query):
     """Applique les filtres sélectionnés aux générations"""
@@ -417,6 +420,168 @@ def display_statistics(generations):
         
         st.subheader("Total des générations")
         st.metric("Nombre total", len(generations))
+
+def display_debug_info():
+    """Affiche les informations de debug pour diagnostiquer la structure S3"""
+    st.header("🔧 Informations de Debug")
+    
+    s3_service = init_s3_service()
+    
+    # Analyse de la structure du bucket
+    st.subheader("📁 Structure du Bucket S3")
+    
+    with st.spinner("Analyse de la structure du bucket..."):
+        try:
+            structure = s3_service.get_bucket_structure_info()
+            
+            if structure:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("**Images par approche:**")
+                    for approach, count in structure['images']['by_approach'].items():
+                        st.write(f"- {approach}: {count} fichiers")
+                    
+                    st.write(f"**Images debug:** {structure['images']['debug']} fichiers")
+                
+                with col2:
+                    st.write("**Métadonnées:**")
+                    st.write(f"- Générations: {structure['metadata']['by_generation']} fichiers")
+                    st.write(f"- Comparaisons: {structure['metadata']['comparisons']} fichiers")
+                    
+                    st.write("**Index:**")
+                    st.write(f"- Par approche: {structure['indexes']['by_approach']} fichiers")
+                    st.write(f"- Par prompt hash: {structure['indexes']['by_prompt_hash']} fichiers")
+                    st.write(f"- Récents: {structure['indexes']['recent']} fichiers")
+            
+        except Exception as e:
+            st.error(f"Erreur lors de l'analyse: {e}")
+    
+    # Test de connexion et permissions
+    st.subheader("🔐 Test de Connexion")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("Tester la connexion S3"):
+            try:
+                # Test basique de listage
+                response = s3_service.s3_client.list_objects_v2(
+                    Bucket=s3_service.bucket_name,
+                    MaxKeys=1
+                )
+                st.success("✅ Connexion S3 réussie")
+                st.write(f"Bucket: {s3_service.bucket_name}")
+                st.write(f"Région: {s3_service.aws_region}")
+                
+            except Exception as e:
+                st.error(f"❌ Erreur de connexion: {e}")
+    
+    with col2:
+        if st.button("Lister les premiers objets"):
+            try:
+                response = s3_service.s3_client.list_objects_v2(
+                    Bucket=s3_service.bucket_name,
+                    MaxKeys=10
+                )
+                
+                if 'Contents' in response:
+                    st.write("**Premiers objets trouvés:**")
+                    for obj in response['Contents'][:10]:
+                        st.write(f"- {obj['Key']} ({obj['Size']} bytes)")
+                else:
+                    st.warning("Aucun objet trouvé dans le bucket")
+                    
+            except Exception as e:
+                st.error(f"Erreur lors du listage: {e}")
+    
+    # Test spécifique des métadonnées
+    st.subheader("📄 Test des Métadonnées")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("Lister metadata/by_generation/"):
+            try:
+                paginator = s3_service.s3_client.get_paginator('list_objects_v2')
+                pages = paginator.paginate(
+                    Bucket=s3_service.bucket_name,
+                    Prefix='metadata/by_generation/',
+                    MaxKeys=10
+                )
+                
+                found_files = []
+                for page in pages:
+                    if 'Contents' in page:
+                        found_files.extend([obj['Key'] for obj in page['Contents'][:5]])
+                
+                if found_files:
+                    st.write("**Fichiers de métadonnées trouvés:**")
+                    for file in found_files:
+                        st.write(f"- {file}")
+                else:
+                    st.warning("Aucun fichier trouvé dans metadata/by_generation/")
+                    
+            except Exception as e:
+                st.error(f"Erreur: {e}")
+    
+    with col2:
+        if st.button("Tester un fichier de métadonnées"):
+            try:
+                # Trouve le premier fichier de métadonnées
+                response = s3_service.s3_client.list_objects_v2(
+                    Bucket=s3_service.bucket_name,
+                    Prefix='metadata/by_generation/',
+                    MaxKeys=1
+                )
+                
+                if 'Contents' in response and response['Contents']:
+                    first_file = response['Contents'][0]['Key']
+                    st.write(f"**Test du fichier:** {first_file}")
+                    
+                    # Charge le contenu
+                    metadata = s3_service._load_metadata_from_s3(first_file)
+                    if metadata:
+                        st.success("✅ Métadonnées chargées avec succès")
+                        
+                        # Affiche un échantillon
+                        st.write("**Échantillon des données:**")
+                        sample = {
+                            'generation_id': metadata.get('generation_id', 'N/A'),
+                            'approach': metadata.get('approach', 'N/A'),
+                            'timestamp': metadata.get('timestamp', 'N/A')
+                        }
+                        st.json(sample)
+                        
+                        # Test de l'image correspondante
+                        image_key = s3_service._get_image_key_from_metadata(metadata)
+                        if image_key:
+                            st.write(f"**Image correspondante:** {image_key}")
+                            if s3_service._object_exists(image_key):
+                                st.success("✅ Image trouvée")
+                            else:
+                                st.error("❌ Image non trouvée")
+                        else:
+                            st.error("❌ Impossible de déterminer le chemin de l'image")
+                    else:
+                        st.error("❌ Impossible de charger les métadonnées")
+                else:
+                    st.warning("Aucun fichier de métadonnées trouvé")
+                    
+            except Exception as e:
+                st.error(f"Erreur: {e}")
+    
+    # Informations sur l'environnement
+    st.subheader("⚙️ Configuration")
+    
+    env_info = {
+        'AWS_REGION': os.getenv('AWS_REGION', 'Non défini'),
+        'S3_BUCKET_NAME': os.getenv('S3_BUCKET_NAME', 'Non défini'),
+        'AWS_ACCESS_KEY_ID': f"{os.getenv('AWS_ACCESS_KEY_ID', 'Non défini')[:10]}..." if os.getenv('AWS_ACCESS_KEY_ID') else 'Non défini'
+    }
+    
+    for key, value in env_info.items():
+        st.write(f"**{key}:** {value}")
 
 if __name__ == "__main__":
     main()
